@@ -1,0 +1,27 @@
+{ 
+  "0x1": {
+    "registry": "0xab5c8051b9a1df1aab0149f8b0630848b7ecabf6",
+    "identityManager": "0x22a4d688748845e9d5d7394a0f05bc583adf4656",
+    "rpcUrl": "https://mainnet.infura.io"
+  },
+  "0x3": {
+    "registry": "0x41566e3a081f5032bdcad470adb797635ddfe1f0",
+    "identityManager": "0x27500ae27b6b6ad7de7d64b1def90f3e6e7ced47",
+    "rpcUrl": "https://ropsten.infura.io"
+  },
+  "0x2a": {
+    "registry": "0x5f8e9351dc2d238fb878b6ae43aa740d62fc9758",
+    "identityManager": "0xdb55d40684e7dc04655a9789937214b493a2c2c6",
+    "rpcUrl": "https://kovan.infura.io"
+  },
+  "0x4": {
+    "registry": "0x2cc31912b2b0f3075a87b3640923d45a26cef3ee",
+    "identityManager": "0x19aece3ae41ee33c30f331906b7e4bb578946a55",
+    "rpcUrl": "https://rinkeby.infura.io"
+  },
+  "5777": {
+    "registry": "0x3f22a64e75a1c4bbb5894a4882aef240c6fea01c",
+    "identityManager": "0x0ddd27df7dd974920876dec2891b19c2ebfc37b9",
+    "rpcUrl": "http://127.0.0.1:7545"
+  }
+}

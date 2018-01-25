@@ -255,20 +255,45 @@ program
       }
 
     }).then(res => {
-
       console.log(' \n uPort Identity Creeated! \n')
+      // TODO pretty print the identity
       console.log(uportClient)
 
       let serialized = serializeUportClient(uportClient)
-      console.log(serialized)
-      console.log('\n Saving client to file ' + fileName + '.');
-      fs.writeFileSync(fileName, serialized)
+      console.log('\n Saving client')
 
-      // TODO pretty print the identity
-      // TODO have a pointer file, then other files by name in another folder
-      // TODO where are the files written, maybe keep a list of files
+      return writeFiles(fileName, serialized)
+    }).then(res => {
+      console.log('All Done!')
     })
   })
+
+
+const writeFiles = (fileName, serialized) => new Promise((resolve, reject) => {
+  fs.lstat('./uport-client', (err, stats) => {
+    if (err) {
+      fs.mkdir('./uport-client', (err) => {
+        if(err) reject(err)
+        const indexString = JSON.stringify({ identity: fileName })
+        fs.writeFile('./uport-client/index.json', indexString, (err) => {
+          if(err) reject(err);
+          fs.writeFile(`./uport-client/${fileName}.json`, serialized, (err) => {
+            if(err) reject(err);
+            resolve()
+          })
+        })
+      })
+    } else {
+      fs.writeFile('./uport-client/index.json', indexString, (err) => {
+        if(err) reject(err);
+        fs.writeFile(`./uport-client/${fileName}.json`, serialized, (err) => {
+          if(err) reject(err);
+          resolve()
+        })
+      })
+    }
+  })
+})
 
 program
   .command('consume <uri>')

@@ -335,6 +335,46 @@ const readIndex = () => new Promise((resolve, reject) => {
   })
 })
 
+// TODO clean up readability and code
+program
+  .command('identity [name]')
+  .description('Initialize a new uPort identity')
+  .action(function(name){
+    if (!name) {
+      readIndex().then(res => {
+        res = JSON.parse(res)
+        const names = res.all
+        const id = res.identity
+        names.forEach(e => {
+          if (e === id) {
+            console.log(`* ${e}`)
+          } else {
+            console.log(`  ${e}`)
+          }
+        })
+      })
+    } else {
+      let sethuh
+      readIndex().then(res => {
+        res = JSON.parse(res)
+        const names = res.all
+        if (!!names.includes(name)) {
+          sethuh = true
+          return  writeSetIdentity(name)
+        }
+        // else { throw new Error('Not a valid identity')}
+      }).then(res => {
+        if (sethuh) {
+          console.log(`Selected the identity ${name}`)
+        } else {
+          console.log('Invalid name')
+        }
+      })
+    }
+  })
+
+
+
 program
   .command('consume <uri>')
   .description('Consume the message <uri> and process it')

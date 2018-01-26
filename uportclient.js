@@ -268,30 +268,70 @@ program
     })
   })
 
-
-const writeFiles = (fileName, serialized) => new Promise((resolve, reject) => {
+const initFiles = () => new Promise((resolve, reject) => {
   fs.lstat('./uport-client', (err, stats) => {
     if (err) {
       fs.mkdir('./uport-client', (err) => {
         if(err) reject(err)
-        const indexString = JSON.stringify({ identity: fileName })
-        fs.writeFile('./uport-client/index.json', indexString, (err) => {
-          if(err) reject(err);
-          fs.writeFile(`./uport-client/${fileName}.json`, serialized, (err) => {
-            if(err) reject(err);
-            resolve()
-          })
-        })
-      })
-    } else {
-      fs.writeFile('./uport-client/index.json', indexString, (err) => {
-        if(err) reject(err);
-        fs.writeFile(`./uport-client/${fileName}.json`, serialized, (err) => {
-          if(err) reject(err);
+        fs.writeFile(`./uport-client/index.json`, JSON.stringify({ identity: '', all:[] }), (err) => {
+          if(err) reject(err)
           resolve()
         })
       })
+    } else {
+      resolve()
     }
+  })
+})
+
+const writeSerializedIdentity = (name, serialized) => new Promise((resolve, reject) => {
+  fs.writeFile(`./uport-client/${name}.json`, serialized, (err) => {
+    if(err) reject(err)
+    resolve()
+  })
+})
+
+const writeSetIdentity = (name) => new Promise((resolve, reject) => {
+  fs.readFile('./uport-client/index.json', 'utf8', (err, res) => {
+    if (err) reject(err)
+    const index = JSON.parse(res)
+    index.identity = name
+    const indexString = JSON.stringify(index)
+    fs.writeFile('./uport-client/index.json', indexString, (err) => {
+      if(err) reject(err)
+      resolve()
+    })
+  })
+})
+
+const writeAddIdentity = (name) => new Promise((resolve, reject) => {
+  fs.readFile('./uport-client/index.json', 'utf8', (err, res) => {
+    if (err) reject(err)
+    const index = JSON.parse(res)
+    // TODO move this error to earlier
+    if (index.all.includes(name)) reject("Can't create identity with same reference name")
+    index.all.push(name)
+    const indexString = JSON.stringify(index)
+    fs.writeFile('./uport-client/index.json', indexString, (err) => {
+      if(err) reject(err);
+      resolve()
+    })
+  })
+})
+
+const writeFiles = (fileName, serialized) => {
+  return initFiles()
+    .then(res => writeSetIdentity(fileName))
+    .then(res => writeAddIdentity(fileName))
+    .then(res => writeSerializedIdentity(fileName, serialized))
+    .catch(err => console.log('ERROR: ' + err))
+}
+
+// TODO use above as well
+const readIndex = () => new Promise((resolve, reject) => {
+  fs.readFile('./uport-client/index.json', 'utf8', (err, res) => {
+    if (err) reject(err)
+    resolve(res)
   })
 })
 

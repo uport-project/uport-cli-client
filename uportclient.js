@@ -373,23 +373,33 @@ program
     }
   })
 
-
-
 program
   .command('consume <uri>')
   .description('Consume the message <uri> and process it')
   .action(function (uri) {
     // This function probably needs to display what you are
     // about to do and have a y/n type dialog before proceeding
-    const serializedClient = fs.readFileSync(program.infile, 'utf8')
-    uportClient = deserializeUportClient(serializedClient)
-
-    uportClient.consume(uri).then(res => {
+    let identity
+    readIndex().then(res => {
+      res = JSON.parse(res)
+      identity = res.identity
+      return new Promise((resolve, reject) => {
+        fs.readFile(`./uport-client/${identity}.json`, 'utf8', (err, res) => {
+          if (err) reject(err)
+          resolve(res)
+        })
+      })
+    }).then(serializedClient => {
+      uportClient = deserializeUportClient(serializedClient)
+      return uportClient.consume(uri)
+    }).then(res => {
       console.log(res)
       // Reserialize the state to update nonce etc
-      // Not sure if this is the best way to go about this...
+      // Not sure if this is the best way to go about this. (No will change)
       const serialized = serializeUportClient(uportClient)
-      fs.writeFileSync(program.infile, serialized)
+      return writeSerializedIdentity(identity, serialized)
+    }).then(res => {
+      // ...
     })
 })
 

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-const UPortClient = require("uport-mock-client").UPortClient
-const serializeUportClient = require("uport-mock-client").serialize
-const deserializeUportClient = require("uport-mock-client").deserialize
-const genKeyPair = require("uport-mock-client").genKeyPair
+const UPortClient = require("uport-client").UPortClient
+const serializeUportClient = require("uport-client").serialize
+const deserializeUportClient = require("uport-client").deserialize
+const genKeyPair = require("uport-client").genKeyPair
 const program = require("commander")
 const inquirer = require('inquirer');
-const deploy = require("uport-mock-client").deploy
+const deploy = require("uport-client").deploy
 const fs = require("fs")
 
 let uportClient
@@ -40,7 +40,7 @@ const networks = {
     "rpcUrl": "https://rinkeby.infura.io"
   },
   "Local Test Network": {
-    "id": "5777",
+    "id": "0x5777",
     "registry": "0x3f22a64e75a1c4bbb5894a4882aef240c6fea01c",
     "identityManager": "0x0ddd27df7dd974920876dec2891b19c2ebfc37b9",
     "rpcUrl": "http://127.0.0.1:7545"
@@ -434,9 +434,105 @@ program
     })
 })
 
-// TODO revisit what some options can be
-program.option('-i, --infile <file>', 'File containing the serialized identity (required by the "consume" command)')
-program.option('-c, --netconfig <file>', 'File containing the network config (required by the "create" command)')
-program.option('-n, --netid <id>', 'Network ID as defined in network config file (required by the "create" command)')
+// TODO MODIFY COMMANDS
+// TODO Modify DDO - go through prompt again, with defaults available to keep or change
+// TODO allow a more general interface in future to modify and write to DDO for any identity.
+program
+  .command('modify appDDO')
+  .description('Modify DDO of an app identity')
+  .action(function () {
+      let uportClient
+      // TODO Separate this func
+      let identity
+      readIndex().then(res => {
+        res = JSON.parse(res)
+        identity = res.identity
+        return new Promise((resolve, reject) => {
+          fs.readFile(`./uport-client/${identity}.json`, 'utf8', (err, res) => {
+            if (err) reject(err)
+            resolve(res)
+          })
+        })
+      }).then(serializedClient => {
+        uportClient = deserializeUportClient(serializedClient)
+        return uportClient.getDDO()
+      }).then(ddo => {
+        const modifyPrompt  = [{
+            type : 'list',
+            name : 'key',
+            choices: [
+              `Name: ${ddo.name || 'No Value'}`,
+              `Description: ${ddo.description || 'No Value'}`,
+              `Url: ${ddo.url || 'No Value'}`,
+              `Image: ${ddo.image || 'No Value'}`,
+              'All: Change all values'
+            ],
+            message : 'Which value(s) do you want to change?'
+          }]
+
+          return recursiveDDOModify(modifyPrompt[0], ddo)
+      }).then(ddo => {
+        return uportClient.appDDO(ddo.name, ddo.description, ddo.url, ddo.image)
+      }).then(ddo => {
+        // TODO add confirmation prompt before writing the DDO
+        return uportClient.writeDDO(ddo)
+      }).then(res => {
+        // res is txhash
+        console.log('Updated DDO written and update completed.')
+        return writeSerializedIdentity(identity, serialized)
+      }).catch(console.log)
+  })
+
+
+const recursiveDDOModify = (prompt, ddo = {}) => {
+  let continuePrompt = true
+  let promptKey
+  return inquirer.prompt(prompt).then(answers => {
+
+    promptKey = answers.key.substring(0, answers.key.indexOf(':')).toLowerCase()
+    const promptVal = answers.key.substring(answers.key.indexOf(': '))
+
+    if (promptKey === 'none') {
+      continuePrompt = false
+      return ddo
+    }
+
+    if (['name', 'description', 'url'].includes(promptKey)) {
+      // same prompt for all these
+      const changePrompt = [{
+         type : 'input',
+         name : 'val',
+         message : `Current Value: ${promptVal} \n  Enter your new value: `
+       }]
+      return inquirer.prompt(changePrompt)
+    } else if(promptKey === 'image') {
+        // messaging specicific to image url
+        const changeImagePrompt = [{
+           type : 'input',
+           name : 'val',
+           message : `Current Value: ${promptVal} \n  Enter new value as path to local file, it will be uploaded to ipfs: `
+         }]
+
+      return inquirer.prompt(changeImagePrompt)
+    } else {
+      // TODO build relevant all request
+    }
+  }).then(answers => {
+    const obj = {}
+    obj[promptKey] =  answers.val
+    const newDDO = Object.assign(ddo, obj)
+    prompt.choices.unshift('None: I am all done modifying values')
+    // prompt.choices[prompt.choices.length - 1] = 'None: I am all done modifying values'
+    if (continuePrompt) {
+      return recursiveDDOModify(prompt, newDDO)
+    } else {
+      return newDDO
+    }
+  })
+}
+
+// TODO Modify Configs -
+//  find the subset of configs which can be changed (and not changed)
+//  interactively go through which ones can be chaged and offer default to keep or change.
 
 program.parse(process.argv);

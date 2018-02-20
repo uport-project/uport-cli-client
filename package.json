@@ -14,6 +14,6 @@
   "dependencies": {
     "commander": "^2.13.0",
     "inquirer": "^5.0.1",
-    "uport-mock-client": "uport-project/uport-js-client#master"
+    "uport-client": "github:uport-project/uport-js-client#master"
   }
 }

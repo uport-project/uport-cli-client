@@ -434,54 +434,57 @@ program
     })
 })
 
-// TODO MODIFY COMMANDS
-// TODO Modify DDO - go through prompt again, with defaults available to keep or change
-// TODO allow a more general interface in future to modify and write to DDO for any identity.
 program
-  .command('modify appDDO')
-  .description('Modify DDO of an app identity')
-  .action(function () {
-      let uportClient
-      // TODO Separate this func
-      let identity
-      readIndex().then(res => {
-        res = JSON.parse(res)
-        identity = res.identity
-        return new Promise((resolve, reject) => {
-          fs.readFile(`./uport-client/${identity}.json`, 'utf8', (err, res) => {
-            if (err) reject(err)
-            resolve(res)
-          })
-        })
-      }).then(serializedClient => {
-        uportClient = deserializeUportClient(serializedClient)
-        return uportClient.getDDO()
-      }).then(ddo => {
-        const modifyPrompt  = [{
-            type : 'list',
-            name : 'key',
-            choices: [
-              `Name: ${ddo.name || 'No Value'}`,
-              `Description: ${ddo.description || 'No Value'}`,
-              `Url: ${ddo.url || 'No Value'}`,
-              `Image: ${ddo.image || 'No Value'}`,
-              'All: Change all values'
-            ],
-            message : 'Which value(s) do you want to change?'
-          }]
-
-          return recursiveDDOModify(modifyPrompt[0], ddo)
-      }).then(ddo => {
-        return uportClient.appDDO(ddo.name, ddo.description, ddo.url, ddo.image)
-      }).then(ddo => {
-        // TODO add confirmation prompt before writing the DDO
-        return uportClient.writeDDO(ddo)
-      }).then(res => {
-        // res is txhash
-        console.log('Updated DDO written and update completed.')
-        return writeSerializedIdentity(identity, serialized)
-      }).catch(console.log)
+  .command('modify <type>')
+  .description('Modify DDO of an app identity or Modify config of an app identity')
+  .action(function (type) {
+     if (type === 'appDDO') return modifyAppDDO()
+     if (type === 'config') return modifyConfig()
+     cosole.log('Not a valid modify type')
   })
+
+const modifyAppDDO = () => {
+    let uportClient
+    // TODO Separate this func
+    let identity
+    readIndex().then(res => {
+      res = JSON.parse(res)
+      identity = res.identity
+      return new Promise((resolve, reject) => {
+        fs.readFile(`./uport-client/${identity}.json`, 'utf8', (err, res) => {
+          if (err) reject(err)
+          resolve(res)
+        })
+      })
+    }).then(serializedClient => {
+      uportClient = deserializeUportClient(serializedClient)
+      return uportClient.getDDO()
+    }).then(ddo => {
+      const modifyPrompt  = [{
+          type : 'list',
+          name : 'key',
+          choices: [
+            `Name: ${ddo.name || 'No Value'}`,
+            `Description: ${ddo.description || 'No Value'}`,
+            `Url: ${ddo.url || 'No Value'}`,
+            `Image: ${ddo.image || 'No Value'}`
+          ],
+          message : 'Which value(s) do you want to change?'
+        }]
+
+        return recursiveDDOModify(modifyPrompt[0], ddo)
+    }).then(ddo => {
+      return uportClient.appDDO(ddo.name, ddo.description, ddo.url, ddo.image)
+    }).then(ddo => {
+      // TODO add confirmation prompt before writing the DDO
+      return uportClient.writeDDO(ddo)
+    }).then(res => {
+      // res is txhash
+      console.log('Updated DDO written and update completed.')
+      const serialized = serializeUportClient(uportClient)
+      return writeSerializedIdentity(identity, serialized)
+    }).catch(console.log)
+  }
 
 
 const recursiveDDOModify = (prompt, ddo = {}) => {
@@ -514,8 +517,6 @@ const recursiveDDOModify = (prompt, ddo = {}) => {
          }]
 
       return inquirer.prompt(changeImagePrompt)
-    } else {
-      // TODO build relevant all request
     }
   }).then(answers => {
     const obj = {}
@@ -531,8 +532,78 @@ const recursiveDDOModify = (prompt, ddo = {}) => {
   })
 }
 
-// TODO Modify Configs -
-//  find the subset of configs which can be changed (and not changed)
-//  interactively go through which ones can be chaged and offer default to keep or change.
+// TODO combine with function above
+const recursiveConfigModify = (prompt, config = {}) => {
+  let continuePrompt = true
+  let promptKey
+  return inquirer.prompt(prompt).then(answers => {
+
+    promptKey = answers.key.substring(0, answers.key.indexOf(':')).toLowerCase()
+    const promptVal = answers.key.substring(answers.key.indexOf(': '))
+
+    if (promptKey === 'none') {
+      continuePrompt = false
+      return config
+    }
+
+    const changePrompt = [{
+       type : 'input',
+       name : 'val',
+       message : `Current Value: ${promptVal} \n  Enter your new value: `
+     }]
+    return inquirer.prompt(changePrompt)
+  }).then(answers => {
+    const obj = {}
+    obj[promptKey] =  answers.val
+    const newDDO = Object.assign(config, obj)
+    prompt.choices.unshift('None: I am all done modifying values')
+    if (continuePrompt) {
+      return recursiveConfigModify(prompt, newDDO)
+    } else {
+      return newDDO
+    }
+  })
+}
+
+const modifyConfig = () => {
+  let uportClient
+  // TODO Separate this func
+  let identity
+  readIndex().then(res => {
+    res = JSON.parse(res)
+    identity = res.identity
+    return new Promise((resolve, reject) => {
+      fs.readFile(`./uport-client/${identity}.json`, 'utf8', (err, res) => {
+        if (err) reject(err)
+        resolve(res)
+      })
+    })
+  }).then(serializedClient => {
+    uportClient = deserializeUportClient(serializedClient)
+
+    const modifyPrompt  = [{
+        type : 'list',
+        name : 'key',
+        choices: [
+          `RPC Url: ${uportClient.network.rpcUrl || 'No Value'}`,
+          `IPFS Url: ${uportClient.ipfsUrl || 'No Value'}`,
+        ],
+        message : 'Which value(s) do you want to change?'
+      }]
+
+      const config = {
+        rpcUrl: uportClient.network.rpcUrl,
+        ipfsUrl: uportClient.ipfsUrl
+      }
+
+      return recursiveConfigModify(modifyPrompt[0], config)
+ }).then(config => {
+   uportClient.network.rpcUrl = config.rpcUrl
+   uportClient.ipfsUrl = config.ipfsUrl
+   console.log('Updated config written and update completed.')
+   const serialized = serializeUportClient(uportClient)
+   return writeSerializedIdentity(identity, serialized)
+ }).catch(console.log)
+}
 
 program.parse(process.argv);

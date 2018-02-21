@@ -218,9 +218,9 @@ program
 
       // TODO give estimates for amount necessaryt to each creation below
       if (config.deploy === true ) {
-        console.log(`\n Please fund the following address ${config.deviceKeys.address}. Then the contracts can be deployed and identity created \n`)
+        console.log(`\n Please fund the following address: \n\n ${config.deviceKeys.address} \n\n Then the contracts can be deployed and identity created \n`)
       } else {
-        console.log(`\n Please fund the following address ${config.deviceKeys.address}. Then your identity can be created \n`)
+        console.log(`\n Please fund the following address: \n\n ${config.deviceKeys.address} \n\n Then your identity can be created \n`)
       }
       return inquirer.prompt(fundContinue)
     }).then(res => {

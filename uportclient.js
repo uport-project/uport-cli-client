@@ -73,6 +73,8 @@ program
       }
       return inquirer.prompt(txt.appConfig).then(answers => {
         config.appDDO = answers
+
+        console.log(config.appDDO)
         // TODO handle DDO Configuration
       })
     }).then(res => {
@@ -86,36 +88,22 @@ program
       }
       return inquirer.prompt(txt.fundContinue)
     }).then(res => {
-      if (config.deploy === true ) {
-        console.log('\n Deploying uPort platform contracts...')
-        return deploy(config.network.rpcUrl, {from: config.deviceKeys.address}, config.deviceKeys.privateKey).then(res => {
-          config.network.registry =  res.Registry
-          console.log(`\n uPort registry contract configured and deployed at ${config.network.registry}`)
-          config.network.identityManager  = res.IdentityManager
-          console.log(`uPort Identity Manager contract configured and deployed at ${config.network.identityManager} \n`)
-
-          // TODO better nonce management in client
-          config.nonce = 2
-
-          console.log('Initializing identity... \n')
-          uportClient = new UPortClient(config)
-          if (config.appDDO) {
-            return uportClient.initializeIdentity(uportClient.appDDO(config.appDDO.name, config.appDDO.description, config.appDDO.url, config.appDDO.imgPath))
-          } else {
-            return uportClient.initializeIdentity()
-          }
-        })
-      }
-
-      // TODO redundant
+      if (!config.deploy) return
+      console.log('\n Deploying uPort platform contracts...')
+      return deploy(config.network.rpcUrl, {from: config.deviceKeys.address}, config.deviceKeys.privateKey).then(res => {
+        config.network.registry =  res.Registry
+        config.network.identityManager  = res.IdentityManager
+        config.nonce = 2  // TODO better nonce management in client
+        console.log(`\n uPort registry contract configured and deployed at ${config.network.registry} \n\n uPort Identity Manager contract configured and deployed at ${config.network.identityManager} \n`)
+      })
+    }).then(res => {
       console.log('Initializing identity... \n')
       uportClient = new UPortClient(config)
-      if (config.appDDO) {
-        return uportClient.initializeIdentity(uportClient.appDDO(config.appDDO.name, config.appDDO.description, config.appDDO.url, config.appDDO.imgPath))
-      } else {
-        return uportClient.initializeIdentity()
-      }
-
+      if (!config.appDDO) return
+      return uportClient.appDDO(config.appDDO.name, config.appDDO.description, config.appDDO.url, config.appDDO.imgPath)
+    }).then(appDDO => {
+      if (appDDO) return uportClient.initializeIdentity(appDDO)
+      return uportClient.initializeIdentity()
     }).then(res => {
       console.log(' \n uPort Identity Creeated! \n')
       // TODO pretty print the identity

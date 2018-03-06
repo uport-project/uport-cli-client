@@ -20,102 +20,153 @@ program
   .command('create <fileName>')
   .description('Create a new uPort client identity and save it to <fileName>.')
   .action((fileName) => {
-    // Create config object
-    let config = { network: {}}
-
-    inquirer.prompt(txt.network).then(answers => {
-        if (answers.networkid === 'Custom Network') {
-          inquirer.prompt(txt.networkDeploy).then(answers => {
-            if (answers.deployConfirm === true) config.deploy = true
-            return inquirer.prompt(txt.networkConfigRPC)
-          }).then(answers => {
-            config.network.rpcUrl = answers.rpcUrl
-            return inquirer.prompt(txt.ipfsConfirm)
-          })
-        }
-
-        const net = txt.networks[answers.networkid]
-        // TODO pretty print
-        console.log(`\nYou selected ${answers.networkid}, the following is the default configuration: \n\n ${JSON.stringify(net, null, 4)}\n`)
-
-        // Overwritten with non defaults
-        config.network = net
-
-        return inquirer.prompt(txt.networkConfirm).then(answers => {
-          if (answers.netConfirm === false) {
-
-            console.log(`\n The following is the default ipfs configuration: \n \n ipfsUrl = ${ipfsUrl}\n`)
-            return inquirer.prompt(txt.ipfsConfirm)
+    fileExist(`./uport-client/index.json`).then(exist => {
+      if (exist) {
+        readIndex().then(res => {
+          const names = res.all
+          if (names.includes(fileName)) {
+            let deploy, client
+            return readIdentity(fileName)
+                      .then(json => deserializeUportClient(json))
+                      .then(res => {
+                        client = res
+                        if(client.initialized) {
+                          throw new Error("Can't create identity with same reference name")
+                        } else {
+                          return readDeploy(fileName)
+                        }
+                      }).then(bool => {
+                        deploy = bool
+                        return readLocalDDO(fileName)
+                      }).then(appDDO => {
+                        console.log('Identity already configured but was not initialized, try intializing again:')
+                        return initFlow({deploy, appDDO}, client)
+                      })
+          } else {
+            return startCreate()
           }
-          return inquirer.prompt(txt.networkDeploy).then(answers => {
-            if (answers.deployConfirm === true) {
-              config.deploy = true
-              return inquirer.prompt(txt.networkConfigRPC)
-            }
-          }).then(answers => {
-            config.network.rpcUrl = answers.rpcUrl
-            console.log(`\n The following is the default ipfs configuration: \n  \n ipfsUrl = ${ipfsUrl}\n`)
-            return inquirer.prompt(txt.ipfsConfirm)
-          })
         })
-    }).then(answers => {
-      if (answers.ipfsConfirm === true){
-        config.ipfsConfig = ipfsUrl
-        return inquirer.prompt(txt.appConfirm)
+      } else {
+        return startCreate()
       }
-      return inquirer.prompt(txt.ipfsConfig).then(answers => {
-        config.ipfsConfig = answers.ipfsUrl
-        return inquirer.prompt(txt.appConfirm)
-      })
-    }).then(answers => {
-      if (answers.appConfirm === false) {
+    })
+
+    const startCreate = ()  => new Promise((resolve, reject) => {
+      // Create config object
+      let config = { network: {}}
+      let uportClient
+      return inquirer.prompt(txt.network).then(answers => {
+          if (answers.networkid === 'Custom Network') {
+            inquirer.prompt(txt.networkDeploy).then(answers => {
+              if (answers.deployConfirm === true) config.deploy = true
+              return inquirer.prompt(txt.networkConfigRPC)
+            }).then(answers => {
+              config.network.rpcUrl = answers.rpcUrl
+              return inquirer.prompt(txt.ipfsConfirm)
+            })
+          }
+
+          const net = txt.networks[answers.networkid]
+          // TODO pretty print
+          console.log(`\nYou selected ${answers.networkid}, the following is the default configuration: \n\n ${JSON.stringify(net, null, 4)}\n`)
+
+          // Overwritten with non defaults
+          config.network = net
+
+          return inquirer.prompt(txt.networkConfirm).then(answers => {
+            if (answers.netConfirm === false) {
+
+              console.log(`\n The following is the default ipfs configuration: \n \n ipfsUrl = ${ipfsUrl}\n`)
+              return inquirer.prompt(txt.ipfsConfirm)
+            }
+            return inquirer.prompt(txt.networkDeploy).then(answers => {
+              if (answers.deployConfirm === true) {
+                config.deploy = true
+                return inquirer.prompt(txt.networkConfigRPC)
+              }
+            }).then(answers => {
+              config.network.rpcUrl = answers.rpcUrl
+              console.log(`\n The following is the default ipfs configuration: \n  \n ipfsUrl = ${ipfsUrl}\n`)
+              return inquirer.prompt(txt.ipfsConfirm)
+            })
+          })
+      }).then(answers => {
+        if (answers.ipfsConfirm === true){
+          config.ipfsConfig = ipfsUrl
+          return inquirer.prompt(txt.appConfirm)
+        }
+        return inquirer.prompt(txt.ipfsConfig).then(answers => {
+          config.ipfsConfig = answers.ipfsUrl
+          return inquirer.prompt(txt.appConfirm)
+        })
+      }).then(answers => {
+        if (answers.appConfirm === false) {
+          return
+        }
+        return inquirer.prompt(txt.appConfig).then(answers => {
+          config.appDDO = answers
+          return writeLocalDDO(fileName, config.appDDO)
+        })
+      }).then(res => {
+        config.deviceKeys = genKeyPair()
+        uportClient = new UPortClient(config)
+        let serialized = serializeUportClient(uportClient)
+        return writeFiles(fileName, serialized)
+      }).then(res => {
+        if (config.deploy) return writeDeploy(fileName, true)
         return
-      }
-      return inquirer.prompt(txt.appConfig).then(answers => {
-        config.appDDO = answers
-
-        console.log(config.appDDO)
-        // TODO handle DDO Configuration
+      }).then(res => {
+        return initFlow(config, uportClient)
       })
-    }).then(res => {
-      config.deviceKeys = genKeyPair()
+    })
 
+
+    // TODO cleanup
+    const initFlow = (config, uportClient) => new Promise((resolve, reject) => {
       // TODO give estimates for amount necessary for each creation below
       if (config.deploy === true ) {
-        console.log(`\n Please fund the following address: \n\n ${config.deviceKeys.address} \n\n Then the contracts can be deployed and identity created \n`)
+        console.log(`\n Please fund the following address: \n\n ${uportClient.deviceKeys.address} \n\n Then the contracts can be deployed and identity created \n`)
       } else {
-        console.log(`\n Please fund the following address: \n\n ${config.deviceKeys.address} \n\n Then your identity can be created \n`)
+        console.log(`\n Please fund the following address: \n\n ${uportClient.deviceKeys.address} \n\n Then your identity can be created \n`)
       }
-      return inquirer.prompt(txt.fundContinue)
-    }).then(res => {
-      if (!config.deploy) return
-      console.log('\n Deploying uPort platform contracts...')
-      return deploy(config.network.rpcUrl, {from: config.deviceKeys.address}, config.deviceKeys.privateKey).then(res => {
-        config.network.registry =  res.Registry
-        config.network.identityManager  = res.IdentityManager
-        config.nonce = 2  // TODO better nonce management in client
-        console.log(`\n uPort registry contract configured and deployed at ${config.network.registry} \n\n uPort Identity Manager contract configured and deployed at ${config.network.identityManager} \n`)
+      return inquirer.prompt(txt.fundContinue).then(res => {
+        if (!config.deploy) return
+        console.log('\n Deploying uPort platform contracts...')
+        return deploy(uportClient.network.rpcUrl, {from: uportClient.deviceKeys.address}, uportClient.deviceKeys.privateKey).then(res => {
+          uportClient.network.registry =  res.Registry
+          uportClient.network.identityManager  = res.IdentityManager
+          uportClient.identityManagerAddress = res.IdentityManager
+          uportClient.registryAddress = res.Registry
+          uportClient.nonce = 2  // TODO better nonce management in client
+          uportClient.initTransactionSigner(uportClient.identityManagerAddress)
+          console.log(`\n uPort registry contract configured and deployed at ${uportClient.network.registry} \n\n uPort Identity Manager contract configured and deployed at ${uportClient.network.identityManager} \n`)
+          return writeDeploy(fileName, false)
+        }).then(res => {
+          let serialized = serializeUportClient(uportClient)
+          return writeFiles(fileName, serialized)
+        })
+      }).then(res => {
+        console.log('Initializing identity... \n')
+        if (!config.appDDO) return
+        return uportClient.appDDO(config.appDDO.name, config.appDDO.description, config.appDDO.url, config.appDDO.imgPath)
+      }).then(appDDO => {
+        if (appDDO) return uportClient.initializeIdentity(appDDO)
+        return uportClient.initializeIdentity()
+      }).then(res => {
+        console.log(' \n uPort Identity Creeated! \n')
+        // TODO pretty print the identity
+        console.log(uportClient)
+
+        let serialized = serializeUportClient(uportClient)
+        console.log('\n Saving client')
+
+        return writeFiles(fileName, serialized)
+      }).then(res => {
+        console.log('All Done!')
+        return writeLocalDDO(fileName, {})
       })
-    }).then(res => {
-      console.log('Initializing identity... \n')
-      uportClient = new UPortClient(config)
-      if (!config.appDDO) return
-      return uportClient.appDDO(config.appDDO.name, config.appDDO.description, config.appDDO.url, config.appDDO.imgPath)
-    }).then(appDDO => {
-      if (appDDO) return uportClient.initializeIdentity(appDDO)
-      return uportClient.initializeIdentity()
-    }).then(res => {
-      console.log(' \n uPort Identity Creeated! \n')
-      // TODO pretty print the identity
-      console.log(uportClient)
-
-      let serialized = serializeUportClient(uportClient)
-      console.log('\n Saving client')
-
-      return writeFiles(fileName, serialized)
-    }).then(res => {
-      console.log('All Done!')
     })
+
   })
 
 /**
@@ -138,7 +189,7 @@ program
       let sethuh
       readIndex().then(res => {
         const names = res.all
-        if (!!names.includes(name)) {
+        if (names.includes(name)) {
           sethuh = true
           return  writeSetIdentity(name)
         }
@@ -282,12 +333,12 @@ const recursiveModify = (prompt, obj= {}) => {
   })
 }
 
-const initFiles = () => new Promise((resolve, reject) => {
-  fs.lstat('./uport-client', (err, stats) => {
-    if (err) {
+const initFiles = () => fileExist('./uport-client').then(exist => {
+  return new Promise((resolve, reject) => {
+    if (!exist) {
       fs.mkdir('./uport-client', (err) => {
         if(err) reject(err)
-        fs.writeFile(`./uport-client/index.json`, JSON.stringify({ identity: '', all:[] }), (err) => {
+        fs.writeFile(`./uport-client/index.json`, JSON.stringify({ identity: '', all:[], deploy: {}, ddo: {} }), (err) => {
           if(err) reject(err)
           resolve()
         })
@@ -298,10 +349,72 @@ const initFiles = () => new Promise((resolve, reject) => {
   })
 })
 
+const fileExist = (path) => new Promise((resolve, reject) => {
+  fs.lstat(path, (err, stats) => {
+    if (err) resolve(false)
+    resolve(true)
+  })
+})
+
 const writeSerializedIdentity = (name, serialized) => new Promise((resolve, reject) => {
   fs.writeFile(`./uport-client/${name}.json`, serialized, (err) => {
     if(err) reject(err)
     resolve()
+  })
+})
+
+// TODO remove read write redundancies
+
+const writeDeploy = (name, bool) => new Promise((resolve, reject) => {
+  fs.readFile('./uport-client/index.json', 'utf8', (err, res) => {
+    if (err) reject(err)
+    const index = JSON.parse(res)
+
+    if (bool) index.deploy[name] = bool
+    if (!bool) delete index.deploy[name]
+
+    const indexString = JSON.stringify(index)
+    fs.writeFile('./uport-client/index.json', indexString, (err) => {
+      if(err) reject(err)
+      resolve()
+    })
+  })
+})
+
+const readDeploy = (name) => new Promise((resolve, reject) => {
+  fs.readFile('./uport-client/index.json', 'utf8', (err, res) => {
+    if (err) reject(err)
+    const index = JSON.parse(res)
+    if (index.deploy[name]) resolve(true)
+    resolve(false)
+  })
+})
+
+const writeLocalDDO = (name, ddo)  => new Promise((resolve, reject) => {
+  fs.readFile('./uport-client/index.json', 'utf8', (err, res) => {
+    if (err) reject(err)
+    const index = JSON.parse(res)
+
+    if (ddo === {}) {
+      delete index.ddo[name]
+    } else {
+      index.ddo[name] = ddo
+    }
+
+    const indexString = JSON.stringify(index)
+    fs.writeFile('./uport-client/index.json', indexString, (err) => {
+      if(err) reject(err)
+      resolve()
+    })
+  })
+})
+
+const readLocalDDO =  (name) => new Promise((resolve, reject) => {
+  fs.readFile('./uport-client/index.json', 'utf8', (err, res) => {
+    if (err) reject(err)
+    const index = JSON.parse(res)
+    if (index.ddo[name]) resolve(index.ddo[name])
+    resolve({})
   })
 })
 
@@ -322,8 +435,6 @@ const writeAddIdentity = (name) => new Promise((resolve, reject) => {
   fs.readFile('./uport-client/index.json', 'utf8', (err, res) => {
     if (err) reject(err)
     const index = JSON.parse(res)
-    // TODO move this error to earlier
-    if (index.all.includes(name)) reject("Can't create identity with same reference name")
     index.all.push(name)
     const indexString = JSON.stringify(index)
     fs.writeFile('./uport-client/index.json', indexString, (err) => {

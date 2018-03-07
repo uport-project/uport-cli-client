@@ -363,86 +363,49 @@ const writeSerializedIdentity = (name, serialized) => new Promise((resolve, reje
   })
 })
 
-// TODO remove read write redundancies
-
-const writeDeploy = (name, bool) => new Promise((resolve, reject) => {
-  fs.readFile('./uport-client/index.json', 'utf8', (err, res) => {
-    if (err) reject(err)
-    const index = JSON.parse(res)
-
+const writeDeploy = (name, bool) => {
+  return readIndex().then(index => {
     if (bool) index.deploy[name] = bool
     if (!bool) delete index.deploy[name]
-
-    const indexString = JSON.stringify(index)
-    fs.writeFile('./uport-client/index.json', indexString, (err) => {
-      if(err) reject(err)
-      resolve()
-    })
+    return writeIndex(index)
   })
-})
+}
 
-const readDeploy = (name) => new Promise((resolve, reject) => {
-  fs.readFile('./uport-client/index.json', 'utf8', (err, res) => {
-    if (err) reject(err)
-    const index = JSON.parse(res)
-    if (index.deploy[name]) resolve(true)
-    resolve(false)
-  })
-})
+const readDeploy = (name) => {
+  return readIndex().then(index =>  index.deploy[name] ? true : false )
+}
 
-const writeLocalDDO = (name, ddo)  => new Promise((resolve, reject) => {
-  fs.readFile('./uport-client/index.json', 'utf8', (err, res) => {
-    if (err) reject(err)
-    const index = JSON.parse(res)
-
+const writeLocalDDO = (name, ddo) => {
+  return readIndex().then(index => {
     if (ddo === {}) {
       delete index.ddo[name]
     } else {
       index.ddo[name] = ddo
     }
-
-    const indexString = JSON.stringify(index)
-    fs.writeFile('./uport-client/index.json', indexString, (err) => {
-      if(err) reject(err)
-      resolve()
-    })
+    return writeIndex(index)
   })
-})
+}
 
-const readLocalDDO =  (name) => new Promise((resolve, reject) => {
-  fs.readFile('./uport-client/index.json', 'utf8', (err, res) => {
-    if (err) reject(err)
-    const index = JSON.parse(res)
-    if (index.ddo[name]) resolve(index.ddo[name])
-    resolve({})
+const readLocalDDO =  (name) => {
+  return readIndex().then(index => {
+    if (index.ddo[name]) return index.ddo[name]
+    return {}
   })
-})
+}
 
-const writeSetIdentity = (name) => new Promise((resolve, reject) => {
-  fs.readFile('./uport-client/index.json', 'utf8', (err, res) => {
-    if (err) reject(err)
-    const index = JSON.parse(res)
-    index.identity = name
-    const indexString = JSON.stringify(index)
-    fs.writeFile('./uport-client/index.json', indexString, (err) => {
-      if(err) reject(err)
-      resolve()
-    })
+const writeSetIdentity = (name) => {
+  return readIndex().then(index => {
+      index.identity = name
+      return writeIndex(index)
   })
-})
+}
 
-const writeAddIdentity = (name) => new Promise((resolve, reject) => {
-  fs.readFile('./uport-client/index.json', 'utf8', (err, res) => {
-    if (err) reject(err)
-    const index = JSON.parse(res)
-    index.all.push(name)
-    const indexString = JSON.stringify(index)
-    fs.writeFile('./uport-client/index.json', indexString, (err) => {
-      if(err) reject(err);
-      resolve()
-    })
+const writeAddIdentity = (name) => {
+  return readIndex().then(index => {
+      index.all.push(name)
+      return writeIndex(index)
   })
-})
+}
 
 const writeFiles = (fileName, serialized) => {
   return initFiles()
@@ -456,6 +419,13 @@ const readIndex = () => new Promise((resolve, reject) => {
   fs.readFile('./uport-client/index.json', 'utf8', (err, res) => {
     if (err) reject(err)
     resolve(JSON.parse(res))
+  })
+})
+
+const writeIndex = (obj) => new Promise((resolve, reject) => {
+  fs.writeFile('./uport-client/index.json', JSON.stringify(obj), (err) => {
+    if(err) reject(err);
+    resolve()
   })
 })
 

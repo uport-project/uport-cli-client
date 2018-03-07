@@ -1,17 +1,30 @@
 {
   "name": "uport-cli-client",
-  "version": "1.0.0",
-  "description": "Thin cli client built uport-js-client",
-  "main": "uportclient.js",
+  "version": "0.1.0",
+  "description": "Create and manage uPort identities from the command line.",
+  "main": "uport-id.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
-  "license": "ISC",
+  "bin": {
+    "uport-id": "uport-id.js"
+  },
+  "contributors": [
+    {
+      "name": "Zach Ferland",
+      "email": "zach.ferland@consensys.net",
+      "url": "http://consensys.net/"
+    },
+    {
+      "name": "Christian Lundkvist",
+      "email": "christian.lundkvist@consensys.net",
+      "url": "http://consensys.net/"
+    }
+  ],
+  "license": "Apache-2.0",
   "dependencies": {
-    "commander": "*",
-    "uport-mock-client": "uport-project/uport-js-client#master",
-    "bluebird": "*",
-    "keypress": "*"
+    "commander": "^2.13.0",
+    "inquirer": "^5.0.1",
+    "uport-client": "github:uport-project/uport-js-client#master"
   }
 }

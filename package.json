@@ -2,12 +2,12 @@
   "name": "uport-cli-client",
   "version": "0.1.0",
   "description": "Create and manage uPort identities from the command line.",
-  "main": "uportclient.js",
+  "main": "uport-id.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "bin": {
-    "uport-id": "uportclient.js"
+    "uport-id": "uport-id.js"
   },
   "contributors": [
     {

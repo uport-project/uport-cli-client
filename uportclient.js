@@ -17,27 +17,27 @@ const ipfsUrl = 'https://ipfs.infura.io/ipfs/'
 */
 
 program
-  .command('create <fileName>')
-  .description('Create a new uPort client identity and save it to <fileName>.')
-  .action((fileName) => {
+  .command('create <name>')
+  .description('Create a new uPort identity with a given name. Name is just a reference and not related to the identity.')
+  .action((name) => {
     fileExist(`./uport-client/index.json`).then(exist => {
       if (exist) {
         readIndex().then(res => {
           const names = res.all
-          if (names.includes(fileName)) {
+          if (names.includes(name)) {
             let deploy, client
-            return readIdentity(fileName)
+            return readIdentity(name)
                       .then(json => deserializeUportClient(json))
                       .then(res => {
                         client = res
                         if(client.initialized) {
                           throw new Error("Can't create identity with same reference name")
                         } else {
-                          return readDeploy(fileName)
+                          return readDeploy(name)
                         }
                       }).then(bool => {
                         deploy = bool
-                        return readLocalDDO(fileName)
+                        return readLocalDDO(name)
                       }).then(appDDO => {
                         console.log('Identity already configured but was not initialized, try intializing again:')
                         return initFlow({deploy, appDDO}, client)
@@ -105,15 +105,15 @@ program
         }
         return inquirer.prompt(txt.appConfig).then(answers => {
           config.appDDO = answers
-          return writeLocalDDO(fileName, config.appDDO)
+          return writeLocalDDO(name, config.appDDO)
         })
       }).then(res => {
         config.deviceKeys = genKeyPair()
         uportClient = new UPortClient(config)
         let serialized = serializeUportClient(uportClient)
-        return writeFiles(fileName, serialized)
+        return writeFiles(name, serialized)
       }).then(res => {
-        if (config.deploy) return writeDeploy(fileName, true)
+        if (config.deploy) return writeDeploy(name, true)
         return
       }).then(res => {
         return initFlow(config, uportClient)
@@ -140,10 +140,10 @@ program
           uportClient.nonce = 2  // TODO better nonce management in client
           uportClient.initTransactionSigner(uportClient.identityManagerAddress)
           console.log(`\n uPort registry contract configured and deployed at ${uportClient.network.registry} \n\n uPort Identity Manager contract configured and deployed at ${uportClient.network.identityManager} \n`)
-          return writeDeploy(fileName, false)
+          return writeDeploy(name, false)
         }).then(res => {
           let serialized = serializeUportClient(uportClient)
-          return writeFiles(fileName, serialized)
+          return writeFiles(name, serialized)
         })
       }).then(res => {
         console.log('Initializing identity... \n')
@@ -160,10 +160,10 @@ program
         let serialized = serializeUportClient(uportClient)
         console.log('\n Saving client')
 
-        return writeFiles(fileName, serialized)
+        return writeFiles(name, serialized)
       }).then(res => {
         console.log('All Done!')
-        return writeLocalDDO(fileName, {})
+        return writeLocalDDO(name, {})
       })
     })
 
@@ -177,7 +177,7 @@ program
 
 program
   .command('identity [name]')
-  .description('List all identities or pass a name to select another identity')
+  .description('List all identities and see currently selected identity. Optionally pass a name to select another identity.')
   .action( name => {
     if (!name) {
       readIndex().then(index => {
@@ -212,7 +212,7 @@ program
 
 program
   .command('consume <uri>')
-  .description('Consume the message <uri> and process it')
+  .description('Selected identity consumes given <uri> and processes it. Any changed state will be saved.')
   .action((uri) => {
     // TODO confirm dialog before write
     // TODO how to get identity name, without multiple file writes
@@ -238,7 +238,7 @@ program
 
 program
   .command('export [fileName]')
-  .description('Export a serialized version of an identity')
+  .description('Selected identity is serialized and written to standard output. Optionally pass a file path/name to have the serialized identity written to the given file')
   .action(function (fileName) {
     getSelectedIdentity().then(client => {
       const serializedClient = serializeUportClient(client)
@@ -264,7 +264,7 @@ program
 
 program
   .command('modify [type]')
-  .description('Modify DDO of an app identity or Modify config of an app identity')
+  .description('Modify DDO of an app identity by passing in `appDDO` type or modify config of an app identity by passing `config` type. Only a subset of config values can be changed once an identity is initialized.')
   .action(function (type) {
      if (type === 'appDDO') return modifyAppDDO()
      if (type === 'config') return modifyConfig()

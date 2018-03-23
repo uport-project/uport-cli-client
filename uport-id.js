@@ -153,7 +153,7 @@ program
         if (appDDO) return uportClient.initializeIdentity(appDDO)
         return uportClient.initializeIdentity()
       }).then(res => {
-        console.log(' \n uPort Identity Creeated! \n')
+        console.log(' \n uPort Identity Created! \n')
         // TODO pretty print the identity
         console.log(uportClient)
 
